@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자전거 통근 크레딧 정산</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--muted:#5d6b7c;--line:#dfe3e8;--accent:#1f3864;--accent-ink:#fff;--err:#c0392b;--err-bg:#fbe4e0;--warn:#9a6a00;--warn-bg:#fff3cd;--ok:#1e7b4a;--ok-bg:#dff3e7}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12161c;--card:#1b222b;--ink:#e6ebf1;--muted:#9aa8b8;--line:#2d3743;--accent:#7fa6e8;--accent-ink:#0d1520;--err:#ff8f80;--err-bg:#3d1f1b;--warn:#f2c85c;--warn-bg:#3a3014;--ok:#6fd49b;--ok-bg:#15301f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:16px;margin:0 0 12px}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+label{display:block;font-weight:600;font-size:13px;margin-bottom:4px}
+label small{font-weight:400;color:var(--muted)}
+input[type=file],input[type=date],input[type=number],select,textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:140px;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.note{color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:22px}
+.stat span{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tab{background:none;color:var(--muted);border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.table-wrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--accent);color:var(--accent-ink);z-index:1}
+td.num,th.num{text-align:right}
+td.msg{white-space:normal;min-width:320px}
+tr.void td{background:var(--warn-bg)}
+.badge{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.b-ERROR,.b-FAIL{background:var(--err-bg);color:var(--err)}
+.b-WARN,.b-REVIEW{background:var(--warn-bg);color:var(--warn)}
+.b-INFO,.b-PASS{background:var(--ok-bg);color:var(--ok)}
+.alert{padding:10px 12px;border-radius:8px;margin-bottom:12px;background:var(--err-bg);color:var(--err)}
+.privacy{background:var(--ok-bg);color:var(--ok);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:16px}
+details summary{cursor:pointer;font-weight:600}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>자전거 통근 크레딧 정산</h1>
+  <p class="sub">자전거 출퇴근 크레딧 분기 정산 · 규칙 검증 · 밴드 스크리닝</p>
+  <div class="privacy">엑셀과 명단은 이 PC의 브라우저 안에서만 처리되고 어디로도 전송되지 않습니다. (엑셀을 읽는 라이브러리만 인터넷에서 불러옵니다.)</div>
+
+  <section class="card">
+    <h2>1. 파일과 기준 선택</h2>
+    <div class="grid">
+      <div><label for="f-book">정산 엑셀 <small>(필수)</small></label><input id="f-book" type="file" accept=".xlsx,.xlsm"></div>
+      <div><label for="quarter">정산 분기</label>
+        <select id="quarter"><option value="1">1분기 (1-3월 · 4/25 지급)</option><option value="2">2분기 (4-6월 · 7/25 지급)</option><option value="3" selected>3분기 (7-9월 · 10/25 지급)</option><option value="4">4분기 (10-12월 · 익년 1/25 지급)</option></select></div>
+      <div><label for="asof">정산 기준일</label><input id="asof" type="date"></div>
+      <div><label for="f-config">규칙 설정 config.json <small>(선택, 없으면 기본값)</small></label><input id="f-config" type="file" accept=".json"></div>
+      <div><label for="f-roster">입·퇴사자 명단 CSV <small>(선택)</small></label><input id="f-roster" type="file" accept=".csv"></div>
+      <div><label for="f-screen">스크리닝 결과 CSV <small>(선택)</small></label><input id="f-screen" type="file" accept=".csv"></div>
+      <div><label for="f-prior">이전 분기 실제 지급액 CSV <small>(선택)</small></label><input id="f-prior" type="file" accept=".csv"></div>
+      <div><label for="f-snap">입력 마감일에 저장한 엑셀 사본 <small>(선택)</small></label><input id="f-snap" type="file" accept=".xlsx,.xlsm"></div>
+    </div>
+    <details style="margin-top:14px"><summary>공휴일 목록 (공휴일에 쉬는 구분에만 적용) — 필요하면 수정</summary>
+      <p class="note">한 줄에 하나, <code>YYYY-MM-DD 이름</code>. 설정 파일에서 off_on_holidays가 false인 구분에는 영향이 없습니다. 5/1(근로자의 날) 같은 항목은 조직의 휴무 기준에 맞게 넣거나 빼세요.</p>
+      <textarea id="holidays" spellcheck="false"></textarea>
+    </details>
+    <div class="row"><button id="run" disabled>정산 실행</button><span class="note" id="status">엑셀 파일을 선택하세요.</span></div>
+  </section>
+
+  <div id="error" class="alert hidden"></div>
+
+  <section id="results" class="hidden">
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <div class="row" style="margin:0 0 12px"><button id="dl-settle" class="secondary">정산 엑셀 다운로드</button><button id="dl-errors" class="secondary">검증 오류 목록 다운로드</button></div>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="panel"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+"use strict";
+/* ============================ 핵심 로직 (Python 스킬 cclib.py와 같은 규칙) ============================ */
+const DEFAULT_CONFIG = {rate_per_ride:2000, annual_cap:400000, deadline_day:7, payout_day:25, kinds:{
+  OFFICE:{label:"사무직", sheet_suffix:"OFFICE", workdays:[0,1,2,3,4], off_on_holidays:true, unit_suffixes:[]},
+  STORE:{label:"매장직", sheet_suffix:"STORE", workdays:[1,2,3,4,5,6], off_on_holidays:false, unit_suffixes:[]}}};
+let CFG, RATE, CAP, KINDS, SUFFIX2KIND, SHEET_RE;
+function applyConfig(cfg){
+  if (!cfg || !cfg.kinds || !Object.keys(cfg.kinds).length) throw new Error("설정 파일에 kinds가 없습니다.");
+  for (const k of ["rate_per_ride","annual_cap","deadline_day","payout_day"]) if (!Number.isFinite(Number(cfg[k]))) throw new Error(`설정 파일에 ${k} 값이 없습니다.`);
+  CFG = cfg; RATE = Number(cfg.rate_per_ride); CAP = Number(cfg.annual_cap); KINDS = cfg.kinds;
+  SUFFIX2KIND = Object.fromEntries(Object.entries(KINDS).map(([k,v]) => [v.sheet_suffix, k]));
+  SHEET_RE = new RegExp("^(\\d{2})_(" + Object.keys(SUFFIX2KIND).map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")$");
+}
+applyConfig(DEFAULT_CONFIG);
+const kindOrder = k => { const i = Object.keys(KINDS).indexOf(k); return i < 0 ? 99 : i; };
+const sheetName = (m, k) => `${pad(m)}_${KINDS[k].sheet_suffix}`;
+const QM = {1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12]};
+const WD_KO = "월화수목금토일";
+const SEV = {ERROR:0, WARN:1, INFO:2};
+const pad = n => String(n).padStart(2, "0");
+const iso = (y,m,d) => `${y}-${pad(m)}-${pad(d)}`;
+const dim = (y,m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const wd0 = (y,m,d) => (new Date(Date.UTC(y, m-1, d)).getUTCDay() + 6) % 7; // 월=0
+const quarterOf = m => Math.floor((m-1)/3) + 1;
+const clean = v => v == null ? "" : String(v).trim();
+function normStaff(v){
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? String(Math.trunc(v)) : null;
+  const s = String(v).replace(/\D/g, "");
+  return s || null;
+}
+function deadline(y,q){ const last = QM[q][2], d = Number(CFG.deadline_day); return last === 12 ? iso(y+1,1,d) : iso(y,last+1,d); }
+function payoutDate(y,q){ const last = QM[q][2], d = Number(CFG.payout_day); return last === 12 ? iso(y+1,1,d) : iso(y,last+1,d); }
+function parseDate(s){
+  s = clean(s); if (!s) return null;
+  const m = s.match(/^(\d{4})[-/.]?(\d{1,2})[-/.]?(\d{1,2})$/);
+  if (!m) throw new Error(`날짜 형식을 읽을 수 없습니다: ${s} (YYYY-MM-DD 권장)`);
+  return iso(+m[1], +m[2], +m[3]);
+}
+
+function toAoa(ws){
+  if (!ws || !ws["!ref"]) return [];
+  const e = XLSX.utils.decode_range(ws["!ref"]).e;
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:true, range:`A1:${XLSX.utils.encode_cell(e)}`});
+}
+const cell = (aoa, r, c) => (aoa[r] && aoa[r][c] !== undefined) ? aoa[r][c] : null;
+
+function loadBook(wb, yearOpt, label){
+  if (!wb.Sheets["Summary"]) throw new Error(`${label}: Summary 시트가 없습니다. 정산 엑셀 형식이 맞는지 확인하세요.`);
+  const sum = toAoa(wb.Sheets["Summary"]);
+  let year = yearOpt || (typeof cell(sum,9,3) === "number" ? cell(sum,9,3) : null);
+  if (!year) throw new Error(`${label}: Summary D10에서 연도를 찾을 수 없습니다.`);
+  const book = {year, master:new Map(), rows:[], entries:[], issues:[], sheets:{}};
+  const add = (severity, code, message, action, kw) => book.issues.push(Object.assign({severity, code, message, action, staffNo:"", name:"", unit:"", sheet:"", cell:"", date:null, month:null}, kw||{}));
+  book.add = add;
+
+  let hdr = -1;
+  for (let r = 0; r < Math.min(sum.length, 40); r++) if (clean(cell(sum,r,0)) === "STAFF #") { hdr = r; break; }
+  if (hdr < 0) throw new Error(`${label}: Summary에서 'STAFF #' 헤더를 찾을 수 없습니다.`);
+  for (let r = hdr+1; r < sum.length; r++){
+    const no = normStaff(cell(sum,r,0)); if (!no) continue;
+    const p = {staffNo:no, name:clean(cell(sum,r,1)), unit:clean(cell(sum,r,2)), row:r+1};
+    if (book.master.has(no)){
+      const f = book.master.get(no);
+      add("WARN","MASTER_DUP",`Summary에 같은 사번이 ${f.row}행과 ${p.row}행에 중복됩니다. 첫 행 기준으로 1명으로 계산합니다.`,"중복 행 정리",{staffNo:no,name:p.name,unit:p.unit,sheet:"Summary",cell:`A${p.row}`});
+      continue;
+    }
+    book.master.set(no, p);
+  }
+
+  const names = wb.SheetNames.filter(n => SHEET_RE.test(n))
+    .sort((a,b) => (+a.slice(0,2) - +b.slice(0,2)) || (kindOrder(SUFFIX2KIND[a.slice(3)]) - kindOrder(SUFFIX2KIND[b.slice(3)])));
+  const seen = new Map();
+  for (const name of names){
+    const month = +name.slice(0,2), kind = SUFFIX2KIND[name.slice(3)];
+    book.sheets[name] = {kind, month};
+    const sh = toAoa(wb.Sheets[name]);
+    let h = -1;
+    for (let r = 0; r < Math.min(sh.length, 30); r++) if (cell(sh,r,4) === 1 && cell(sh,r,5) === 2) { h = r; break; }
+    if (h < 0){ add("ERROR","SHEET_LAYOUT","일자 헤더(1, 2, 3 ...)를 찾을 수 없어 시트를 읽지 못했습니다.","시트 형식 확인",{sheet:name,month}); continue; }
+    const dayCols = {};
+    for (let c = 4; c < (sh[h]||[]).length; c++){
+      const v = cell(sh,h,c);
+      if (typeof v === "number") dayCols[Math.trunc(v)] = c;
+      else if (typeof v === "string" && v.trim().toLowerCase() === "total") break;
+    }
+    const dm = dim(year, month), days = Object.keys(dayCols).map(Number);
+    if (days.length !== dm || !days.every(d => d >= 1 && d <= dm))
+      add("WARN","SHEET_LAYOUT",`${month}월은 ${dm}일까지인데 시트의 일자 열은 ${Math.min(...days)}~${Math.max(...days)}일입니다.`,"시트 형식 확인",{sheet:name,month});
+    for (let r = h+1; r < sh.length; r++){
+      const no = normStaff(cell(sh,r,0)); if (!no) continue;
+      const nm = clean(cell(sh,r,1)), unit = clean(cell(sh,r,2));
+      const info = {sheet:name,row:r+1,staffNo:no,name:nm,unit,month,kind,dup:false};
+      const key = `${month}|${no}`;
+      if (!seen.has(key)) seen.set(key, [name, r+1]);
+      const first = seen.get(key);
+      if (first[0] !== name || first[1] !== r+1){
+        info.dup = true;
+        add("ERROR","DUP_IN_MONTH",`같은 달에 사번이 중복 입력되었습니다(최초 입력: ${first[0]} ${first[1]}행). 이 행은 계산에서 제외합니다.`,"제외",{staffNo:no,name:nm,unit,sheet:name,cell:`A${r+1}`,month});
+      }
+      book.rows.push(info);
+      for (const [dayStr, col] of Object.entries(dayCols)){
+        const day = +dayStr; if (day > dm) continue;
+        const raw = cell(sh,r,col);
+        if (raw == null || (typeof raw === "string" && !raw.trim())) continue;
+        const coord = XLSX.utils.encode_cell({r, c:col});
+        const date = iso(year, month, day);
+        const [rides, ok] = rideValue(raw, add, {staffNo:no,name:nm,unit,sheet:name,cell:coord,date,month});
+        if (rides === 0) continue;
+        const e = {staffNo:no,name:nm,unit,kind,date,rides,sheet:name,row:r+1,cell:coord,valid:ok,reason:ok?"":"값 오류"};
+        if (info.dup){ e.valid = false; e.reason = "DUP_IN_MONTH"; }
+        book.entries.push(e);
+      }
+    }
+  }
+  return book;
+}
+
+function rideValue(raw, add, kw){
+  let val = raw;
+  if (typeof raw === "string"){
+    const n = Number(raw.trim());
+    if (raw.trim() !== "" && Number.isFinite(n)){ val = n; add("WARN","TEXT_NUMBER",`숫자가 텍스트로 입력되어 있습니다(${JSON.stringify(raw)}). 숫자로 인정합니다.`,"형식 정리",kw); }
+    else { add("ERROR","INVALID_VALUE",`숫자가 아닌 값이 입력되어 있습니다(${JSON.stringify(raw)}).`,"제외",kw); return [1,false]; }
+  }
+  if (typeof val !== "number"){ add("ERROR","INVALID_VALUE",`숫자가 아닌 값이 입력되어 있습니다(${JSON.stringify(raw)}).`,"제외",kw); return [1,false]; }
+  if (val === 0) return [0,true];
+  if (val !== 1 && val !== 2){ add("ERROR","INVALID_VALUE",`라이딩 횟수는 1(편도) 또는 2(왕복)만 가능합니다(입력값 ${raw}).`,"제외",kw); return [Number.isInteger(val) ? val : 1, false]; }
+  return [val, true];
+}
+
+function workdayProblem(kind, date, holidays){
+  const [y,m,d] = date.split("-").map(Number), w = wd0(y,m,d), wk = WD_KO[w];
+  const k = KINDS[kind], label = `${k.label || kind}(${kind})`;
+  if (!k.workdays.includes(w)) return `${label}은 ${k.workdays.map(i => WD_KO[i]).join("")}요일 근무인데 ${wk}요일입니다.`;
+  if (k.off_on_holidays && holidays.has(date)) return `${label}은 공휴일(${holidays.get(date)})에 근무하지 않습니다.`;
+  return null;
+}
+
+function validate(book, holidays, asOf, roster, snapshot){
+  const rowsWithRides = new Set(book.entries.map(e => `${e.sheet}|${e.row}`));
+  const orphans = new Map();
+  for (const r of book.rows){
+    if (!book.master.has(r.staffNo)){ if (!orphans.has(r.staffNo)) orphans.set(r.staffNo, []); orphans.get(r.staffNo).push(r); continue; }
+    const p = book.master.get(r.staffNo), kw = {staffNo:r.staffNo,name:r.name,unit:r.unit,sheet:r.sheet,month:r.month};
+    if (p.name && r.name && p.name !== r.name) book.add("WARN","NAME_MISMATCH",`Summary 이름(${p.name})과 시트 이름(${r.name})이 다릅니다.`,"확인",{...kw,cell:`B${r.row}`});
+    if (p.unit && r.unit && p.unit !== r.unit) book.add("WARN","UNIT_MISMATCH",`Summary 부서(${p.unit})와 시트 부서(${r.unit})가 다릅니다.`,"확인",{...kw,cell:`C${r.row}`});
+  }
+  for (const [no, rs] of orphans){
+    const withR = rs.filter(r => rowsWithRides.has(`${r.sheet}|${r.row}`)), first = (withR.length ? withR : rs)[0];
+    if (withR.length) book.add("ERROR","NOT_IN_SUMMARY",`Summary 명단에 없는 사번인데 월별 시트(${withR.length}개 시트)에 라이딩이 입력되어 있습니다. 정산에서 제외합니다.`,"제외",{staffNo:no,name:first.name,unit:first.unit,sheet:first.sheet,cell:`A${first.row}`,month:withR.length === 1 ? first.month : null});
+    else book.add("WARN","NOT_IN_SUMMARY",`Summary 명단에 없는 사번이 월별 시트(${rs.length}개 시트)에 남아 있습니다(라이딩 입력 없음). 퇴사자 정리 대상인지 확인하세요.`,"확인",{staffNo:no,name:first.name,unit:first.unit,sheet:first.sheet,cell:`A${first.row}`});
+  }
+  const kinds = new Map();
+  for (const r of book.rows){ if (!kinds.has(r.staffNo)) kinds.set(r.staffNo, new Set()); kinds.get(r.staffNo).add(r.kind); }
+  for (const [no, ks] of kinds) if (ks.size > 1 && book.master.has(no)){
+    const p = book.master.get(no);
+    book.add("WARN","KIND_CONFLICT","여러 구분(예: 사무직과 매장직) 시트에 모두 나타납니다. 근무일 규칙이 시트 기준으로 적용됩니다.","확인",{staffNo:no,name:p.name,unit:p.unit});
+  }
+  const bad = (e, code, msg, kw) => { e.valid = false; e.reason = code; book.add("ERROR", code, msg, "제외", kw); };
+  for (const e of book.entries){
+    if (!e.valid) continue;
+    const kw = {staffNo:e.staffNo,name:e.name,unit:e.unit,sheet:e.sheet,cell:e.cell,date:e.date,month:+e.date.slice(5,7)};
+    if (!book.master.has(e.staffNo)){ e.valid = false; e.reason = "NOT_IN_SUMMARY"; continue; }
+    if (e.date > asOf){ bad(e,"FUTURE_DATE",`기준일(${asOf})보다 미래 날짜에 라이딩이 입력되었습니다.`,kw); continue; }
+    const why = workdayProblem(e.kind, e.date, holidays);
+    if (why){ bad(e,"NON_WORKDAY",`근무일이 아닌 날의 라이딩은 인정되지 않습니다. ${why}`,kw); continue; }
+    const rr = roster && roster.get(e.staffNo);
+    if (rr){
+      if (rr.join && e.date < rr.join){ bad(e,"BEFORE_JOIN",`입사일(${rr.join}) 이전 날짜입니다.`,kw); continue; }
+      if (rr.leave && e.date > rr.leave){ bad(e,"AFTER_LEAVE",`퇴사일(${rr.leave}) 이후 날짜입니다.`,kw); continue; }
+    }
+    if (snapshot && (snapshot.get(`${e.staffNo}|${e.date}`) || 0) < e.rides){ bad(e,"LATE_ENTRY","마감일 스냅샷에 없는(또는 횟수가 늘어난) 입력입니다. 마감 후 입력은 인정되지 않습니다.",kw); continue; }
+  }
+}
+function snapshotIndex(book){
+  const out = new Map();
+  for (const e of book.entries) if (e.valid) out.set(`${e.staffNo}|${e.date}`, (out.get(`${e.staffNo}|${e.date}`) || 0) + e.rides);
+  return out;
+}
+function quarterNotes(book, q, asOf, hasSnap){
+  const dl = deadline(book.year, q);
+  if (asOf <= dl) book.add("WARN","QUARTER_OPEN",`${q}분기 입력 마감일(${dl})이 아직 지나지 않았습니다(기준일 ${asOf}). 마감 후 다시 정산하세요.`,"마감 후 재실행");
+  else if (!hasSnap) book.add("INFO","LATE_UNVERIFIABLE",`엑셀에는 입력 시각이 없어 마감일(${dl}) 이후 입력/수정 여부를 확인할 수 없습니다. 마감일에 저장해 둔 사본이 있으면 '마감일 사본'으로 지정하세요.`,"참고");
+  for (const m of QM[q]) for (const k of Object.keys(KINDS))
+    if (!book.sheets[sheetName(m,k)]) book.add("WARN","MISSING_SHEET",`${sheetName(m,k)} 시트가 없습니다.`,"확인",{month:m});
+}
+
+function settle(book, quarter, screening, prior){
+  const voided = new Set();
+  for (const [k, v] of screening) if (v.result === "FAIL") voided.add(k);
+  const raw = new Map(), valid = new Map(), kindOf = new Map(), errCount = new Map();
+  for (const r of book.rows) if (!kindOf.has(r.staffNo)) kindOf.set(r.staffNo, r.kind);
+  for (const e of book.entries){
+    const k = `${e.staffNo}|${+e.date.slice(5,7)}`;
+    raw.set(k, (raw.get(k)||0) + e.rides);
+    if (e.valid) valid.set(k, (valid.get(k)||0) + e.rides);
+  }
+  for (const i of book.issues) if (i.severity === "ERROR" && i.staffNo && (i.month == null || quarterOf(i.month) === quarter))
+    errCount.set(i.staffNo, (errCount.get(i.staffNo)||0) + 1);
+  const rows = [], months = QM[quarter];
+  for (const p of book.master.values()){
+    let cum = 0, credited = {}, gross = 0, pay = 0, before = 0;
+    for (let q = 1; q <= quarter; q++){
+      if (q === quarter && prior && prior.has(p.staffNo)) cum = Math.min(CAP, prior.get(p.staffNo));
+      credited = {};
+      for (const m of QM[q]) { const k = `${p.staffNo}|${m}`; credited[m] = voided.has(k) ? 0 : (valid.get(k) || 0); }
+      gross = Object.values(credited).reduce((a,b) => a+b, 0) * RATE;
+      pay = Math.min(gross, Math.max(0, CAP - cum));
+      before = cum; cum += pay;
+    }
+    const voidM = months.filter(m => voided.has(`${p.staffNo}|${m}`)), notes = [];
+    if (voidM.length) notes.push("스크리닝 불일치로 무효: " + voidM.map(m => `${m}월`).join(", "));
+    if (gross > pay) notes.push(`연 한도 도달로 ${(gross-pay).toLocaleString()}원 미지급`);
+    else if (cum >= CAP) notes.push("연 한도 도달");
+    if (errCount.get(p.staffNo)) notes.push(`검증 오류 ${errCount.get(p.staffNo)}건(오류 목록 참고)`);
+    const rawQ = {}; for (const m of months) rawQ[m] = raw.get(`${p.staffNo}|${m}`) || 0;
+    rows.push({staffNo:p.staffNo,name:p.name,unit:p.unit,kind:kindOf.get(p.staffNo)||"",raw:rawQ,credited,voided:voidM,
+      rides:Object.values(credited).reduce((a,b)=>a+b,0),gross,paidBefore:before,payout:pay,cumAfter:cum,remaining:CAP-cum,note:notes.join("; ")});
+  }
+  return rows;
+}
+
+/* ---------- CSV ---------- */
+function parseCsv(text){
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){ if (ch === '"'){ if (text[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ","){ row.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r"){ if (ch === "\r" && text[i+1] === "\n") i++; row.push(f); f = ""; if (row.some(x => x !== "")) rows.push(row); row = []; }
+    else f += ch;
+  }
+  row.push(f); if (row.some(x => x !== "")) rows.push(row);
+  if (!rows.length) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  return rows.slice(1).map(r => Object.fromEntries(head.map((h,i) => [h, (r[i] ?? "").trim()])));
+}
+function toCsv(fields, rows){
+  const esc = v => { v = v == null ? "" : String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
+  return "﻿" + [fields.join(","), ...rows.map(r => fields.map(f => esc(r[f])).join(","))].join("\r\n");
+}
+function loadRoster(text){
+  const out = new Map();
+  parseCsv(text).forEach((r, i) => {
+    const no = normStaff(r.staff_no); if (!no) return;
+    const unit = clean(r.unit); let kind = clean(r.type).toUpperCase();
+    if (!KINDS[kind]) kind = SUFFIX2KIND[kind] || Object.keys(KINDS).find(k => (KINDS[k].unit_suffixes || []).some(s => unit.endsWith(s))) || Object.keys(KINDS)[0];
+    try { out.set(no, {staffNo:no,name:clean(r.name),unit,kind,join:parseDate(r.join_date),leave:parseDate(r.leave_date)}); }
+    catch (e){ throw new Error(`명단 ${i+2}행: ${e.message}`); }
+  });
+  return out;
+}
+function loadScreening(text){
+  const out = new Map();
+  for (const r of parseCsv(text)){
+    const no = normStaff(r.staff_no); if (!no) continue;
+    let res = clean(r.result).toUpperCase();
+    res = ["FAIL","불일치","상이","무효"].includes(res) ? "FAIL" : ["REVIEW","확인필요"].includes(res) ? "REVIEW" : "PASS";
+    out.set(`${no}|${parseInt(r.month,10)}`, {result:res, note:clean(r.note)});
+  }
+  return out;
+}
+function loadPrior(text){
+  const out = new Map();
+  for (const r of parseCsv(text)){ const no = normStaff(r.staff_no); if (no) out.set(no, Math.trunc(Number(r.paid))); }
+  return out;
+}
+function parseHolidays(text){
+  const out = new Map();
+  for (const line of text.split(/\r?\n/)){
+    const m = line.trim().match(/^(\d{4})-(\d{2})-(\d{2})\s*(.*)$/);
+    if (m) out.set(`${m[1]}-${m[2]}-${m[3]}`, m[4] || "공휴일");
+  }
+  return out;
+}
+
+/* ---------- 입·퇴사 비교 ---------- */
+function rosterDiff(book, roster){
+  const newHires = [], leavers = [], changes = [], notIn = [];
+  for (const [no, r] of roster){
+    const p = book.master.get(no);
+    if (!p){ if (!r.leave) newHires.push(r); continue; }
+    if (r.leave) leavers.push(r);
+    if ((r.name && r.name !== p.name) || (r.unit && r.unit !== p.unit)) changes.push({p, r});
+  }
+  for (const [no, p] of book.master) if (!roster.has(no)) notIn.push(p);
+  return {newHires, leavers, changes, notIn};
+}
+
+/* ---------- 스크리닝 ---------- */
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function enteredMap(book){
+  const out = new Map();
+  for (const e of book.entries) if (e.valid){ const k = `${e.staffNo}|${+e.date.slice(5,7)}`; if (!out.has(k)) out.set(k, []); out.get(k).push([e.date, e.rides]); }
+  for (const v of out.values()) v.sort();
+  return out;
+}
+function samplePlan(book, quarter, rate, seed, allMonths){
+  const months = QM[quarter], entered = enteredMap(book), kindOf = new Map();
+  for (const r of book.rows) if (!kindOf.has(r.staffNo)) kindOf.set(r.staffNo, r.kind);
+  const pool = {};
+  for (const k of entered.keys()){ const [no, m] = k.split("|"); if (months.includes(+m) && book.master.has(no)) { const kd = kindOf.get(no) || ""; (pool[kd] = pool[kd] || new Set()).add(no); } }
+  const rnd = mulberry32(seed), plan = [];
+  for (const kind of Object.keys(pool).sort()){
+    const people = [...pool[kind]].sort(), n = Math.min(people.length, Math.max(1, Math.ceil(people.length * rate)));
+    for (let i = 0; i < n; i++){ const j = i + Math.floor(rnd() * (people.length - i)); [people[i], people[j]] = [people[j], people[i]]; }
+    for (const no of people.slice(0, n).sort()){
+      const p = book.master.get(no), ms = months.filter(m => entered.get(`${no}|${m}`));
+      const chosen = allMonths ? ms : [ms[Math.floor(rnd() * ms.length)]];
+      for (const m of chosen){
+        const days = entered.get(`${no}|${m}`);
+        plan.push({staff_no:no,name:p.name,unit:p.unit,type:kind,month:m,entered_days:days.map(([d,r]) => `${+d.slice(5,7)}/${+d.slice(8)}(${r})`).join(", "),total_rides:days.reduce((a,[,r])=>a+r,0),seed});
+      }
+    }
+  }
+  return plan;
+}
+const compact = s => clean(s).replace(/\s+/g, "").toLowerCase();
+function checkPosts(book, plan, postsRows, strict){
+  const posts = new Map();
+  for (const r of postsRows){
+    const d = parseDate(r.date); if (!d) continue;
+    const a = compact(r.author); if (!posts.has(a)) posts.set(a, new Map());
+    posts.get(a).set(d, (posts.get(a).get(d) || 0) + (Math.trunc(Number(r.photos)) || 1));
+  }
+  const entered = enteredMap(book), res = [];
+  for (const row of plan){
+    const key = compact(row.name), authors = [...posts.keys()].filter(a => key && (a.includes(key) || key.includes(a)));
+    let note = "";
+    if (!authors.length) note = "밴드 게시글에서 이 직원의 작성자를 찾지 못함(이름 표기 확인 필요)";
+    else if (authors.length > 1) note = `작성자 후보가 여러 명(${authors.length}): 이름이 겹치는지 확인 필요`;
+    const days = new Map();
+    for (const a of authors) for (const [d,n] of posts.get(a)) days.set(d, (days.get(d)||0) + n);
+    const missing = (entered.get(`${row.staff_no}|${row.month}`) || []).filter(([d,r]) => (days.get(d) || 0) < (strict ? r : 1)).map(([d]) => d);
+    res.push({staff_no:row.staff_no,name:row.name,month:row.month,result:missing.length && authors.length ? "FAIL" : !authors.length ? "REVIEW" : "PASS",missing_dates:missing.join(" "),note});
+  }
+  return res;
+}
+
+window.CC = {applyConfig, DEFAULT_CONFIG, loadBook, validate, quarterNotes, settle, snapshotIndex, parseHolidays, loadRoster, loadScreening, loadPrior, rosterDiff, samplePlan, checkPosts, parseCsv, deadline, payoutDate};
+
+/* ============================ 화면 ============================ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const won = n => n.toLocaleString("ko-KR");
+const DEFAULT_HOLIDAYS = `2026-01-01 신정
+2026-02-16 설날 연휴
+2026-02-17 설날
+2026-02-18 설날 연휴
+2026-03-01 삼일절(일)
+2026-03-02 삼일절 대체공휴일
+2026-05-01 근로자의 날
+2026-05-05 어린이날
+2026-05-24 부처님오신날(일)
+2026-05-25 부처님오신날 대체공휴일
+2026-06-03 지방선거일
+2026-06-06 현충일(토)
+2026-08-15 광복절(토)
+2026-08-17 광복절 대체공휴일
+2026-09-24 추석 연휴
+2026-09-25 추석
+2026-09-26 추석 연휴
+2026-10-03 개천절(토)
+2026-10-05 개천절 대체공휴일
+2026-10-09 한글날
+2026-12-25 성탄절`;
+let STATE = null, ACTIVE_TAB = "settle";
+
+(function init(){
+  $("holidays").value = DEFAULT_HOLIDAYS;
+  const t = new Date(); $("asof").value = iso(t.getFullYear(), t.getMonth()+1, t.getDate());
+  $("f-book").addEventListener("change", () => { $("run").disabled = !$("f-book").files.length; $("status").textContent = $("f-book").files.length ? "준비되었습니다." : "엑셀 파일을 선택하세요."; });
+  $("run").addEventListener("click", run);
+  $("dl-settle").addEventListener("click", () => STATE && downloadSettlement(STATE));
+  $("dl-errors").addEventListener("click", () => STATE && downloadErrors(STATE));
+})();
+
+const readBuf = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsArrayBuffer(f); });
+const readText = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsText(f, "utf-8"); });
+
+async function run(){
+  $("error").classList.add("hidden"); $("run").disabled = true; $("status").textContent = "처리 중...";
+  try {
+    if (typeof XLSX === "undefined") throw new Error("엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.");
+    applyConfig($("f-config").files[0] ? JSON.parse(await readText($("f-config").files[0])) : DEFAULT_CONFIG);
+    const q = +$("quarter").value, asOf = $("asof").value;
+    if (!asOf) throw new Error("정산 기준일을 입력하세요.");
+    const wb = XLSX.read(await readBuf($("f-book").files[0]), {type:"array"});
+    const book = loadBook(wb, null, "엑셀");
+    const holidays = parseHolidays($("holidays").value);
+    if (![...holidays.keys()].some(d => d.startsWith(String(book.year)))) throw new Error(`공휴일 목록에 ${book.year}년 날짜가 없습니다. '공휴일 목록'을 열어 입력하세요.`);
+    const roster = $("f-roster").files[0] ? loadRoster(await readText($("f-roster").files[0])) : null;
+    let snap = null;
+    if ($("f-snap").files[0]){ const sb = loadBook(XLSX.read(await readBuf($("f-snap").files[0]), {type:"array"}), book.year, "마감일 사본"); snap = snapshotIndex(sb); }
+    validate(book, holidays, asOf, roster, snap);
+    quarterNotes(book, q, asOf, !!snap);
+    const screening = $("f-screen").files[0] ? loadScreening(await readText($("f-screen").files[0])) : new Map();
+    for (const [k, v] of screening){
+      const [no, m] = k.split("|"), p = book.master.get(no);
+      if (v.result === "REVIEW" && quarterOf(+m) === q) book.add("WARN","SCREENING_REVIEW",`${m}월 스크리닝이 '확인필요' 상태입니다. 결과 확정 전에는 무효 처리하지 않았습니다. ${v.note}`,"결과 확정",{staffNo:no,name:p?p.name:"",unit:p?p.unit:"",month:+m});
+    }
+    const prior = $("f-prior").files[0] ? loadPrior(await readText($("f-prior").files[0])) : null;
+    const rows = settle(book, q, screening, prior);
+    STATE = {book, q, asOf, rows, screening, roster, diff: roster ? rosterDiff(book, roster) : null, plan:null, check:null,
+             fileName: $("f-book").files[0].name};
+    render();
+    $("status").textContent = "완료";
+  } catch (e) {
+    $("error").textContent = e.message || String(e); $("error").classList.remove("hidden"); $("status").textContent = "실패";
+    console.error(e);
+  } finally { $("run").disabled = !$("f-book").files.length; }
+}
+
+const issuesFor = S => S.book.issues.filter(i => i.month == null || QM[S.q].includes(i.month))
+  .sort((a,b) => SEV[a.severity]-SEV[b.severity] || a.code.localeCompare(b.code) || a.sheet.localeCompare(b.sheet) || a.staffNo.localeCompare(b.staffNo) || (a.date||"").localeCompare(b.date||""));
+
+function render(){
+  const S = STATE, iss = issuesFor(S), cnt = k => iss.filter(i => i.severity === k).length;
+  const total = S.rows.reduce((a,r) => a + r.payout, 0), paid = S.rows.filter(r => r.payout > 0).length;
+  $("stats").innerHTML = [
+    [`${won(total)}원`, `${S.book.year}년 ${S.q}분기 총 지급액`],
+    [`${paid}명`, `지급 대상 (명단 ${S.rows.length}명)`],
+    [payoutDate(S.book.year, S.q), `크레딧 지급일 (마감 ${deadline(S.book.year, S.q)})`],
+    [cnt("ERROR"), "검증 ERROR"], [cnt("WARN"), "검증 WARN"],
+  ].map(([b,s]) => `<div class="stat"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+  const tabs = [["settle","정산"],["errors",`검증 오류 (${iss.length})`],["unit","부서별 요약"],["roster","입·퇴사 비교"],["screen","스크리닝"]];
+  $("tabs").innerHTML = tabs.map(([id,l]) => `<button class="tab" role="tab" data-id="${id}" aria-selected="${id===ACTIVE_TAB}">${esc(l)}</button>`).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { ACTIVE_TAB = b.dataset.id; render(); }));
+  $("results").classList.remove("hidden");
+  $("panel").innerHTML = {settle:panelSettle, errors:panelErrors, unit:panelUnit, roster:panelRoster, screen:panelScreen}[ACTIVE_TAB](S, iss);
+  if (ACTIVE_TAB === "screen") bindScreen();
+}
+
+const badge = s => `<span class="badge b-${esc(s)}">${esc(s)}</span>`;
+function table(head, body, numCols = []){
+  return `<div class="table-wrap"><table><thead><tr>${head.map((h,i) => `<th class="${numCols.includes(i)?"num":""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function sortedRows(rows){ return [...rows].sort((a,b) => kindOrder(a.kind) - kindOrder(b.kind) || a.unit.localeCompare(b.unit, "ko") || a.name.localeCompare(b.name, "ko")); }
+
+function panelSettle(S){
+  const ms = QM[S.q];
+  const head = ["사번","이름","부서","구분",...ms.map(m=>`${m}월 입력`),...ms.map(m=>`${m}월 인정`),"인정 횟수","산정액","기지급액","이번 지급액","누적","잔여 한도","비고"];
+  const body = sortedRows(S.rows).map(r => `<tr class="${r.voided.length?"void":""}"><td>${esc(r.staffNo)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.kind)}</td>`
+    + ms.map(m => `<td class="num">${r.raw[m]}</td>`).join("") + ms.map(m => `<td class="num">${r.credited[m]}</td>`).join("")
+    + `<td class="num">${r.rides}</td><td class="num">${won(r.gross)}</td><td class="num">${won(r.paidBefore)}</td><td class="num"><b>${won(r.payout)}</b></td><td class="num">${won(r.cumAfter)}</td><td class="num">${won(r.remaining)}</td><td class="msg">${esc(r.note)}</td></tr>`).join("");
+  const num = []; for (let i = 4; i < head.length - 1; i++) num.push(i);
+  return `<p class="note">'입력'은 엑셀에 적힌 횟수, '인정'은 규칙 검증과 스크리닝 후 횟수입니다. 노란 행은 스크리닝으로 무효가 된 월이 있는 직원입니다.</p>` + table(head, body, num);
+}
+function panelErrors(S, iss){
+  if (!iss.length) return `<p>검증 오류가 없습니다.</p>`;
+  const body = iss.map(i => `<tr><td>${badge(i.severity)}</td><td>${esc(i.code)}</td><td>${esc(i.staffNo)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td>${esc(i.sheet)}</td><td>${esc(i.cell)}</td><td>${esc(i.date||"")}</td><td class="msg">${esc(i.message)}</td><td>${esc(i.action)}</td></tr>`).join("");
+  return table(["심각도","코드","사번","이름","부서","시트","셀","날짜","내용","처리"], body);
+}
+function unitSummary(S){
+  const m = new Map();
+  for (const r of S.rows){ const k = `${r.kind}|${r.unit}`; const u = m.get(k) || {kind:r.kind,unit:r.unit,n:0,paid:0,rides:0,amt:0}; u.n++; u.paid += r.payout > 0 ? 1 : 0; u.rides += r.rides; u.amt += r.payout; m.set(k,u); }
+  return [...m.values()].sort((a,b) => kindOrder(a.kind) - kindOrder(b.kind) || a.unit.localeCompare(b.unit, "ko"));
+}
+function panelUnit(S){
+  const u = unitSummary(S);
+  return table(["구분","부서","인원","지급 인원","인정 횟수","지급액"], u.map(x => `<tr><td>${esc(x.kind)}</td><td>${esc(x.unit)}</td><td class="num">${x.n}</td><td class="num">${x.paid}</td><td class="num">${x.rides}</td><td class="num">${won(x.amt)}</td></tr>`).join(""), [2,3,4,5]);
+}
+function panelRoster(S){
+  if (!S.diff) return `<p>입·퇴사자 명단 CSV를 선택하고 다시 실행하면 비교 결과가 여기에 나옵니다.<br><span class="note">형식: staff_no,name,unit,type,join_date,leave_date (퇴사하지 않았으면 leave_date 비움)</span></p>`;
+  const d = S.diff;
+  const sec = (t, head, rows) => `<h2 style="margin-top:16px">${esc(t)} (${rows.length})</h2>` + (rows.length ? table(head, rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")) : `<p class="note">없음</p>`);
+  return `<p class="note">이 화면은 비교만 합니다. 신규 입사자 행을 엑셀에 추가한 사본을 만들려면 Python 스킬의 <code>roster --apply</code>를 사용하세요. 퇴사일 이후 입력은 정산 때 자동 제외됩니다.</p>`
+    + sec("신규 입사자(엑셀에 없음)", ["사번","이름","부서","구분","입사일"], d.newHires.map(r => [r.staffNo,r.name,r.unit,r.kind,r.join||""]))
+    + sec("퇴사자(엑셀에 있음)", ["사번","이름","부서","퇴사일"], d.leavers.map(r => [r.staffNo,r.name,r.unit,r.leave]))
+    + sec("이름·부서 변경", ["사번","엑셀 이름","명단 이름","엑셀 부서","명단 부서"], d.changes.map(({p,r}) => [p.staffNo,p.name,r.name,p.unit,r.unit]))
+    + sec("명단에 없는 직원", ["사번","이름","부서","Summary 행"], d.notIn.map(p => [p.staffNo,p.name,p.unit,p.row]));
+}
+function panelScreen(S){
+  const plan = S.plan, chk = S.check;
+  let h = `<p class="note">① 대상을 뽑고 → ② 밴드에서 확인한 게시글 CSV로 대조 → ③ 결과 CSV를 '스크리닝 결과 CSV'에 넣어 다시 정산합니다. 밴드 확인 절차는 저장소의 <code>band-verification.md</code>를 참고하세요. FAIL이 확정되면 그 월은 전체 무효입니다.</p>
+  <div class="grid"><div><label for="s-rate">추출 비율 <small>(구분별, 최소 1명)</small></label><input id="s-rate" type="number" min="0.01" max="1" step="0.01" value="${S.rate ?? 0.1}"></div>
+  <div><label for="s-seed">시드 <small>(같은 값이면 같은 결과)</small></label><input id="s-seed" type="number" value="${S.seed ?? Number(S.asOf.replaceAll("-",""))}"></div>
+  <div><label for="s-all">대조할 월</label><select id="s-all"><option value="0">직원당 1개월(무작위)</option><option value="1"${S.all ? " selected" : ""}>분기 내 모든 월</option></select></div></div>
+  <div class="row"><button id="s-run">대상 추출</button>${plan ? `<button id="s-dl-plan" class="secondary">대상 CSV 다운로드</button>` : ""}</div>`;
+  if (plan){
+    h += `<h2 style="margin-top:16px">스크리닝 대상 (${plan.length}건)</h2>` + table(["사번","이름","부서","구분","월","엑셀 입력(일/횟수)","총 횟수"], plan.map(r => `<tr><td>${esc(r.staff_no)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.type)}</td><td>${r.month}</td><td class="msg">${esc(r.entered_days)}</td><td class="num">${r.total_rides}</td></tr>`).join(""), [6]);
+    h += `<h2 style="margin-top:16px">밴드 게시글 대조</h2><div class="grid"><div><label for="s-posts">밴드 게시글 CSV <small>(author,date,photos)</small></label><input id="s-posts" type="file" accept=".csv"></div>
+    <div><label for="s-strict">판정 기준</label><select id="s-strict"><option value="0">날짜별 게시글이 1개 이상</option><option value="1"${S.strict ? " selected" : ""}>라이딩 횟수만큼 사진 수</option></select></div></div>
+    <div class="row"><button id="s-check">대조 실행</button>${chk ? `<button id="s-dl-res" class="secondary">결과 CSV 다운로드</button>` : ""}</div>`;
+  }
+  if (chk){
+    h += `<h2 style="margin-top:16px">대조 결과</h2>` + table(["사번","이름","월","결과","게시글이 없는 날짜","비고"], chk.map(r => `<tr><td>${esc(r.staff_no)}</td><td>${esc(r.name)}</td><td>${r.month}</td><td>${badge(r.result)}</td><td>${esc(r.missing_dates)}</td><td class="msg">${esc(r.note)}</td></tr>`).join(""));
+    h += `<p class="note">FAIL/REVIEW는 게시글을 직접 확인한 뒤 결과 CSV의 result 열을 PASS 또는 FAIL로 확정하세요.</p>`;
+  }
+  return h;
+}
+function bindScreen(){
+  const S = STATE;
+  $("s-run").addEventListener("click", () => {
+    S.rate = Number($("s-rate").value) || 0.1; S.seed = Math.trunc(Number($("s-seed").value)) || 0; S.all = $("s-all").value === "1";
+    S.plan = samplePlan(S.book, S.q, S.rate, S.seed, S.all); S.check = null; render();
+  });
+  if ($("s-dl-plan")) $("s-dl-plan").addEventListener("click", () => saveText(`screening_plan_${S.book.year}Q${S.q}.csv`, toCsv(["staff_no","name","unit","type","month","entered_days","total_rides","seed"], S.plan)));
+  if ($("s-check")) $("s-check").addEventListener("click", async () => {
+    const f = $("s-posts").files[0]; if (!f) return alert("밴드 게시글 CSV를 선택하세요.");
+    try { S.strict = $("s-strict").value === "1"; S.check = checkPosts(S.book, S.plan, parseCsv(await readText(f)), S.strict); render(); }
+    catch (e){ alert(e.message); }
+  });
+  if ($("s-dl-res")) $("s-dl-res").addEventListener("click", () => saveText(`screening_result_${S.book.year}Q${S.q}.csv`, toCsv(["staff_no","name","month","result","missing_dates","note"], S.check)));
+}
+
+/* ---------- 다운로드 ---------- */
+function saveText(name, text){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type:"text/csv;charset=utf-8"}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+function sheetFrom(aoa, widths){ const ws = XLSX.utils.aoa_to_sheet(aoa); ws["!cols"] = widths.map(w => ({wch:w})); return ws; }
+function downloadSettlement(S){
+  const ms = QM[S.q], iss = issuesFor(S), rows = sortedRows(S.rows);
+  const head = ["사번","이름","부서","구분",...ms.map(m=>`${m}월 입력`),...ms.map(m=>`${m}월 인정`),"인정 횟수","산정액","기지급액","이번 지급액","누적 지급액","잔여 한도","비고"];
+  const aoa = [head, ...rows.map(r => [r.staffNo,r.name,r.unit,r.kind,...ms.map(m=>r.raw[m]),...ms.map(m=>r.credited[m]),r.rides,r.gross,r.paidBefore,r.payout,r.cumAfter,r.remaining,r.note])];
+  const sums = head.map((_,i) => i >= 4 && i < head.length - 1 ? aoa.slice(1).reduce((a,row) => a + row[i], 0) : "");
+  sums[0] = "합계"; aoa.push(sums);
+  const u = unitSummary(S);
+  const info = [["대상",`${S.book.year}년 ${S.q}분기 (${ms[0]}~${ms[2]}월)`],["크레딧 지급일",payoutDate(S.book.year,S.q)],["입력 마감일",deadline(S.book.year,S.q)],["정산 기준일",S.asOf],["1회당 크레딧",RATE],["연 한도",CAP],["원본 파일",S.fileName],
+    ["검증 ERROR",iss.filter(i=>i.severity==="ERROR").length],["검증 WARN",iss.filter(i=>i.severity==="WARN").length],["스크리닝 불일치 건수(무효 월)",[...S.screening.values()].filter(v=>v.result==="FAIL").length],
+    ["지급 대상 인원",rows.filter(r=>r.payout>0).length],["총 지급액",rows.reduce((a,r)=>a+r.payout,0)],["주의","금액 지급 전 검증 오류 목록과 스크리닝 결과를 HR이 최종 확인해야 합니다."]];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFrom(aoa, [10,10,18,7,...ms.map(()=>9),...ms.map(()=>9),9,12,12,13,13,12,50]), "정산");
+  XLSX.utils.book_append_sheet(wb, sheetFrom([["구분","부서","인원","지급 인원","인정 횟수","지급액"],...u.map(x=>[x.kind,x.unit,x.n,x.paid,x.rides,x.amt]),["합계","",u.reduce((a,x)=>a+x.n,0),u.reduce((a,x)=>a+x.paid,0),u.reduce((a,x)=>a+x.rides,0),u.reduce((a,x)=>a+x.amt,0)]],[8,20,8,10,10,14]), "부서별 요약");
+  XLSX.utils.book_append_sheet(wb, sheetFrom(info, [30,70]), "기준");
+  XLSX.writeFile(wb, `settlement_${S.book.year}Q${S.q}.xlsx`);
+}
+function downloadErrors(S){
+  const iss = issuesFor(S), wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFrom([["심각도","코드","사번","이름","부서","시트","셀","날짜","내용","처리"],...iss.map(i=>[i.severity,i.code,i.staffNo,i.name,i.unit,i.sheet,i.cell,i.date||"",i.message,i.action])],[9,18,10,10,16,10,8,12,80,12]), "검증 오류 목록");
+  const c = new Map(); for (const i of iss) c.set(`${i.severity}|${i.code}`, (c.get(`${i.severity}|${i.code}`)||0)+1);
+  XLSX.utils.book_append_sheet(wb, sheetFrom([["심각도","코드","건수"],...[...c].sort((a,b)=>SEV[a[0].split("|")[0]]-SEV[b[0].split("|")[0]]||a[0].localeCompare(b[0])).map(([k,n])=>[...k.split("|"),n])],[9,20,8]), "요약");
+  XLSX.writeFile(wb, `validation_errors_${S.book.year}Q${S.q}.xlsx`);
+}
+</script>
+</body>
+</html>

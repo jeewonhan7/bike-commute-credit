@@ -1,0 +1,21 @@
+# 개인정보(사번·이름이 들어 있는 실제 데이터)는 절대 커밋하지 않는다.
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+output/
+data/
+sample/
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 문서용 스크린샷(가상 데이터)은 허용
+!docs/*.jpg
+

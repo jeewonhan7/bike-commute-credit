@@ -1,0 +1,23 @@
+{
+  "_comment": "정산 규칙 설정. 예시 값이며 조직의 제도에 맞게 바꾸세요. 웹 도구(web/index.html)도 같은 파일을 불러올 수 있습니다. 요일은 월=0 ... 일=6.",
+  "rate_per_ride": 2000,
+  "annual_cap": 400000,
+  "deadline_day": 7,
+  "payout_day": 25,
+  "kinds": {
+    "OFFICE": {
+      "label": "사무직",
+      "sheet_suffix": "OFFICE",
+      "workdays": [0, 1, 2, 3, 4],
+      "off_on_holidays": true,
+      "unit_suffixes": []
+    },
+    "STORE": {
+      "label": "매장직",
+      "sheet_suffix": "STORE",
+      "workdays": [1, 2, 3, 4, 5, 6],
+      "off_on_holidays": false,
+      "unit_suffixes": []
+    }
+  }
+}
